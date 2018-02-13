@@ -5,7 +5,13 @@ import (
 	"io/ioutil"
 	"fmt"
 	"strings"
-	//"github.com/robertkrimen/otto"
+	"github.com/robertkrimen/otto"
+	"flag"
+	"strconv"
+)
+
+var (
+	port = flag.Int("p", 8080, "port")
 )
 
 type EndPoint struct {
@@ -15,6 +21,8 @@ type EndPoint struct {
 
 type Response struct {
 	StatusCode int
+	ContentType string
+	Body string
 }
 
 func main() {
@@ -36,7 +44,7 @@ func main() {
 		}
 	}
 
-	r.Run(":8080")
+	r.Run(":" + strconv.Itoa(*port))
 }
 
 func getFiles(dirname string) []EndPoint {
@@ -55,7 +63,16 @@ func getCallback(name string) func(*gin.Context) {
 	res := &Response{
 		StatusCode: 404,
 	}
-	return func(ctx *gin.Context) {
-		ctx.String(res.StatusCode, name)
+	vm := otto.New()
+	return func(c *gin.Context) {
+		buffer, _ := ioutil.ReadFile(name)
+		vm.Set("response", res)
+		vm.Run(string(buffer))
+		switch res.ContentType {
+		case "json":
+			c.JSON(res.StatusCode, res.Body)
+		default:
+			c.String(res.StatusCode, res.Body)
+		}
 	}
 }
